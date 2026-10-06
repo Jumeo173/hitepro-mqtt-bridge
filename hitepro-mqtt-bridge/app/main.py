@@ -89,16 +89,17 @@ def start_cover_timer(client, control_id, direction):
 
 
 def start_stop_timer(client, control_id):
-    """После STOP: briefly show 'stopped', then set 'open' (cover didn't fully close)."""
+    """После STOP: briefly show 'stopped', then restore previous direction."""
     cancel_cover_timer(control_id)
+    prev_direction = COVER_DIRECTIONS.get(control_id, "opening")
     COVER_DIRECTIONS[control_id] = "stopped"
     publish_cover_state(client, control_id, "stopped")
 
     def on_expire():
         publish_cover_state(client, control_id, "open")
         COVER_TIMERS.pop(control_id, None)
-        COVER_DIRECTIONS[control_id] = "opening"
-        _LOGGER.info("Cover %s: stop timer expired -> open (direction set to opening)", control_id)
+        COVER_DIRECTIONS[control_id] = prev_direction
+        _LOGGER.info("Cover %s: stop timer expired -> open (direction restored to %s)", control_id, prev_direction)
 
     timer = threading.Timer(3, on_expire)
     timer.daemon = True

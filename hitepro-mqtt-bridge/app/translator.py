@@ -56,3 +56,29 @@ def cover_state_from_parts(open_val: str, close_val: str) -> str:
     if o == "0" and c == "0":
         return "stopped"
     return "unknown"
+
+
+def cover_state_from_parts(open_val: str, close_val: str) -> str:
+    """Определяет состояние cover по двум топикам реле."""
+    o = str(open_val).strip()
+    c = str(close_val).strip()
+    if o == "1" and c == "0":
+        return "opening"
+    if o == "0" and c == "1":
+        return "closing"
+    return "stopped"
+
+
+def cover_state_on_startup(open_val: str, close_val: str) -> str:
+    """Начальное состояние при старте моста.
+
+    HitePro не обнуляет реле после остановки, поэтому если реле
+    держит 1 — предполагаем, что движение уже завершилось.
+    """
+    o = str(open_val).strip()
+    c = str(close_val).strip()
+    if o == "1" and c == "0":
+        return "open"
+    if o == "0" and c == "1":
+        return "closed"
+    return "stopped"

@@ -74,7 +74,9 @@ def build_discovery(device: dict, base_topic: str, discovery_prefix: str):
             "payload_close": "CLOSE",
             "payload_stop": "STOP",
             "state_open": "open",
+            "state_opening": "opening",
             "state_closed": "closed",
+            "state_closing": "closing",
             "state_stopped": "stopped",
             "device_class": "window",
         })

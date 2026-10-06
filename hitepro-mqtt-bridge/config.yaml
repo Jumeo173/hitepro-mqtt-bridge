@@ -21,6 +21,12 @@ options:
   discovery_prefix: "homeassistant"
   hitepro_device_prefix: "/devices/hite-pro/controls"
   log_level: "info"
+    cover_travel_time:
+        name: Время хода штор (сек)
+        description: Через сколько секунд считать, что штора доехала до конца
+        default: 190
+        type: integer
+
 schema:
   hitepro_json_url: str
   mqtt_host: str

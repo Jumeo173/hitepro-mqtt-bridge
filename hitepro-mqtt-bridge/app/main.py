@@ -9,7 +9,7 @@ import paho.mqtt.client as mqtt
 import requests
 
 from parser import parse_hite_pro_js
-from translator import to_ha, to_hitepro, cover_state_from_parts
+from translator import to_ha, to_hitepro, cover_state_on_startup
 from discovery import build_discovery
 from cache import (
     load_state, save_state,
@@ -44,6 +44,7 @@ def load_options() -> dict:
             "HITEPRO_DEVICE_PREFIX", "/devices/hite-pro/controls"
         ),
         "log_level": os.environ.get("LOG_LEVEL", "info"),
+        "cover_travel_time": int(os.environ.get("COVER_TRAVEL_TIME", "190")),
     }
 
 
@@ -54,6 +55,46 @@ NAMES: dict = load_names()
 PUBLISHED: dict = load_published()
 MQTT_CLIENT = None
 
+COVER_TIMERS: dict = {}
+COVER_TRAVEL_TIME = CONFIG.get("cover_travel_time", 190)
+
+
+# ── Cover timer helpers ──────────────────────────────────────────
+
+def publish_cover_state(client, control_id, state):
+    client.publish(
+        f"{CONFIG['base_topic']}/state/{control_id}",
+        state, retain=True,
+    )
+    _LOGGER.info("Cover %s -> HA: %s", control_id, state)
+
+
+def start_cover_timer(client, control_id, direction):
+    cancel_cover_timer(control_id)
+    final_state = "open" if direction == "opening" else "closed"
+
+    def on_expire():
+        publish_cover_state(client, control_id, final_state)
+        COVER_TIMERS.pop(control_id, None)
+        _LOGGER.info("Cover %s: timer %ds expired -> %s",
+                     control_id, COVER_TRAVEL_TIME, final_state)
+
+    timer = threading.Timer(COVER_TRAVEL_TIME, on_expire)
+    timer.daemon = True
+    timer.start()
+    COVER_TIMERS[control_id] = timer
+    _LOGGER.info("Cover %s: started %ds timer -> %s",
+                 control_id, COVER_TRAVEL_TIME, final_state)
+
+
+def cancel_cover_timer(control_id):
+    timer = COVER_TIMERS.pop(control_id, None)
+    if timer:
+        timer.cancel()
+        _LOGGER.info("Cover %s: timer cancelled", control_id)
+
+
+# ── Device loading ───────────────────────────────────────────────
 
 def fetch_devices() -> list:
     url = CONFIG["hitepro_json_url"]
@@ -77,6 +118,8 @@ def apply_names(devices: list) -> list:
             d["title"] = custom
     return devices
 
+
+# ── Discovery & initial states ───────────────────────────────────
 
 def publish_discovery(client: mqtt.Client):
     current_ids = set()
@@ -111,11 +154,12 @@ def publish_initial_states(client: mqtt.Client):
             close_id = d["close_id"]
             open_val = STATE.get(open_id, "0")
             close_val = STATE.get(close_id, "0")
-            state = cover_state_from_parts(open_val, close_val)
+            state = cover_state_on_startup(open_val, close_val)
             client.publish(
                 f"{CONFIG['base_topic']}/state/{control_id}",
                 state, retain=True,
             )
+            _LOGGER.info("Cover %s initial state: %s", control_id, state)
             continue
 
         if control_id in STATE:
@@ -134,6 +178,8 @@ def publish_initial_states(client: mqtt.Client):
 
     save_state(STATE)
 
+
+# ── MQTT callbacks ────────────────────────────────────────────────
 
 def on_connect(client, userdata, flags, reason_code, properties=None):
     _LOGGER.info("MQTT подключён, rc=%s", reason_code)
@@ -158,6 +204,7 @@ def on_message(client, userdata, msg):
     prefix = CONFIG["hitepro_device_prefix"]
     base = CONFIG["base_topic"]
 
+    # ── Входящие сообщения от HitePro ──
     if topic.startswith(prefix + "/"):
         rest = topic[len(prefix) + 1:]
         if rest.endswith("/on"):
@@ -174,30 +221,56 @@ def on_message(client, userdata, msg):
             return
 
         STATE[control_id] = payload
+        _LOGGER.info("<-- HitePro: %s = %s", control_id, payload)
 
         if device["type"] == "cover":
             open_val = STATE.get(device["open_id"], "0")
             close_val = STATE.get(device["close_id"], "0")
-            ha_state = cover_state_from_parts(open_val, close_val)
-            client.publish(
-                f"{base}/state/{device['control_id']}",
-                ha_state, retain=True,
-            )
-        else:
-            ha_val = to_ha(device, payload)
-            client.publish(
-                f"{base}/state/{control_id}",
-                ha_val, retain=True,
-            )
+            save_state(STATE)
+
+            o = str(open_val).strip()
+            c = str(close_val).strip()
+
+            if o == "1" and c == "0":
+                publish_cover_state(client, device["control_id"], "opening")
+                start_cover_timer(client, device["control_id"], "opening")
+            elif o == "0" and c == "1":
+                publish_cover_state(client, device["control_id"], "closing")
+                start_cover_timer(client, device["control_id"], "closing")
+            elif o == "0" and c == "0":
+                cancel_cover_timer(device["control_id"])
+                publish_cover_state(client, device["control_id"], "stopped")
+            return
+
+        ha_val = to_ha(device, payload)
+        client.publish(
+            f"{base}/state/{control_id}",
+            ha_val, retain=True,
+        )
         save_state(STATE)
         return
 
+    # ── Команды из HA ──
     if topic.startswith(base + "/cmd/"):
         control_id = topic[len(base) + 5:]
         device = DEVICES.get(control_id)
         if device is None:
             _LOGGER.warning("Команда для неизвестного устройства: %s", control_id)
             return
+
+        cmd = str(payload).strip().upper()
+        _LOGGER.info("--> CMD %s: %s", control_id, cmd)
+
+        if device["type"] == "cover":
+            if cmd == "OPEN":
+                publish_cover_state(client, control_id, "opening")
+                start_cover_timer(client, control_id, "opening")
+            elif cmd == "CLOSE":
+                publish_cover_state(client, control_id, "closing")
+                start_cover_timer(client, control_id, "closing")
+            elif cmd == "STOP":
+                cancel_cover_timer(control_id)
+                publish_cover_state(client, control_id, "stopped")
 
         actions = to_hitepro(device, payload)
         for suffix, val in actions:
@@ -223,6 +296,7 @@ def main():
     global MQTT_CLIENT
 
     _LOGGER.info("Запуск HitePro MQTT Bridge")
+    _LOGGER.info("Cover travel time: %ds", COVER_TRAVEL_TIME)
 
     devices = apply_names(fetch_devices())
     DEVICES.update({d["control_id"]: d for d in devices})

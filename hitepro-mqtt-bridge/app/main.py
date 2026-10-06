@@ -71,7 +71,6 @@ def publish_cover_state(client, control_id, state):
 
 def start_cover_timer(client, control_id, direction):
     cancel_cover_timer(control_id)
-    COVER_DIRECTIONS[control_id] = direction
     final_state = "open" if direction == "opening" else "closed"
 
     def on_expire():

@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import threading
+import time
 
 import paho.mqtt.client as mqtt
 import requests
@@ -57,6 +58,7 @@ MQTT_CLIENT = None
 
 COVER_TIMERS: dict = {}
 COVER_DIRECTIONS = {}
+COVER_CMD_LOCK: dict = {}  # control_id -> timestamp отправки команды
 COVER_TRAVEL_TIME = CONFIG.get("cover_travel_time", 190)
 
 
@@ -257,6 +259,10 @@ def on_message(client, userdata, msg):
             if current_dir == "stopped":
                 _LOGGER.info("Cover %s: ignoring HitePro status during stop", device["control_id"])
                 return
+            lock_time = COVER_CMD_LOCK.get(device["control_id"], 0)
+            if time.time() - lock_time < 3.0:
+                _LOGGER.info("Cover %s: ignoring HitePro status (command lock, %.1fs)", device["control_id"], time.time() - lock_time)
+                return
             if o == "1" and c == "0":
                 if current_dir != "opening":
                     publish_cover_state(client, device["control_id"], "opening")
@@ -291,14 +297,17 @@ def on_message(client, userdata, msg):
 
         if device["type"] == "cover":
             if cmd == "OPEN":
+                COVER_CMD_LOCK[control_id] = time.time()
                 publish_cover_state(client, control_id, "opening")
                 start_cover_timer(client, control_id, "opening")
             elif cmd == "CLOSE":
+                COVER_CMD_LOCK[control_id] = time.time()
                 publish_cover_state(client, control_id, "closing")
                 start_cover_timer(client, control_id, "closing")
             elif cmd == "STOP":
                 cur_dir = COVER_DIRECTIONS.get(control_id, "stopped")
                 if cur_dir in ("opening", "closing"):
+                    COVER_CMD_LOCK[control_id] = time.time()
                     start_stop_timer(client, control_id)
                 else:
                     _LOGGER.info("Cover %s: STOP ignored (not moving, state=%s)", control_id, cur_dir)

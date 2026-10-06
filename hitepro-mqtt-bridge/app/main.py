@@ -56,6 +56,7 @@ PUBLISHED: dict = load_published()
 MQTT_CLIENT = None
 
 COVER_TIMERS: dict = {}
+COVER_DIRECTIONS = {}
 COVER_TRAVEL_TIME = CONFIG.get("cover_travel_time", 190)
 
 
@@ -71,11 +72,13 @@ def publish_cover_state(client, control_id, state):
 
 def start_cover_timer(client, control_id, direction):
     cancel_cover_timer(control_id)
+    COVER_DIRECTIONS[control_id] = direction
     final_state = "open" if direction == "opening" else "closed"
 
     def on_expire():
         publish_cover_state(client, control_id, final_state)
         COVER_TIMERS.pop(control_id, None)
+        COVER_DIRECTIONS.pop(control_id, None)
         _LOGGER.info("Cover %s: timer %ds expired -> %s",
                      control_id, COVER_TRAVEL_TIME, final_state)
 
@@ -95,6 +98,7 @@ def start_stop_timer(client, control_id):
     def on_expire():
         publish_cover_state(client, control_id, "open")
         COVER_TIMERS.pop(control_id, None)
+        COVER_DIRECTIONS.pop(control_id, None)
         _LOGGER.info("Cover %s: stop timer expired -> open", control_id)
 
     timer = threading.Timer(3, on_expire)
@@ -106,6 +110,7 @@ def start_stop_timer(client, control_id):
 
 def cancel_cover_timer(control_id):
     timer = COVER_TIMERS.pop(control_id, None)
+    COVER_DIRECTIONS.pop(control_id, None)
     if timer:
         timer.cancel()
         _LOGGER.info("Cover %s: timer cancelled", control_id)
@@ -248,14 +253,18 @@ def on_message(client, userdata, msg):
             o = str(open_val).strip()
             c = str(close_val).strip()
 
+            current_dir = COVER_DIRECTIONS.get(device["control_id"])
             if o == "1" and c == "0":
-                publish_cover_state(client, device["control_id"], "opening")
-                start_cover_timer(client, device["control_id"], "opening")
+                if current_dir != "opening":
+                    publish_cover_state(client, device["control_id"], "opening")
+                    start_cover_timer(client, device["control_id"], "opening")
             elif o == "0" and c == "1":
-                publish_cover_state(client, device["control_id"], "closing")
-                start_cover_timer(client, device["control_id"], "closing")
+                if current_dir != "closing":
+                    publish_cover_state(client, device["control_id"], "closing")
+                    start_cover_timer(client, device["control_id"], "closing")
             elif o == "0" and c == "0":
-                start_stop_timer(client, device["control_id"])
+                if device["control_id"] in COVER_TIMERS or current_dir is not None:
+                    start_stop_timer(client, device["control_id"])
             return
 
         ha_val = to_ha(device, payload)

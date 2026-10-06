@@ -10,7 +10,7 @@ init: false
 ingress: true
 ingress_port: 8099
 services:
-  - mqtt
+  - mqtt:want
 options:
   hitepro_json_url: ""
   mqtt_host: "core-mosquitto"

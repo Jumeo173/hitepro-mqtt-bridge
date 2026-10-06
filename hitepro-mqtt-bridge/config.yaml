@@ -1,5 +1,5 @@
 name: HitePro MQTT Bridge
-version: "1.2.0"
+version: "1.2.1"
 slug: hitepro_mqtt_bridge
 description: Bridge between HitePro and Home Assistant via MQTT
 arch:

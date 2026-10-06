@@ -244,17 +244,9 @@ def on_message(client, userdata, msg):
         if device is None:
             return
 
-        STATE[control_id] = payload
         _LOGGER.info("<-- HitePro: %s = %s", control_id, payload)
 
         if device["type"] == "cover":
-            open_val = STATE.get(device["open_id"], "0")
-            close_val = STATE.get(device["close_id"], "0")
-            save_state(STATE)
-
-            o = str(open_val).strip()
-            c = str(close_val).strip()
-
             current_dir = COVER_DIRECTIONS.get(device["control_id"])
             if current_dir == "stopped":
                 _LOGGER.info("Cover %s: ignoring HitePro status during stop", device["control_id"])
@@ -263,6 +255,16 @@ def on_message(client, userdata, msg):
             if time.time() - lock_time < 3.0:
                 _LOGGER.info("Cover %s: ignoring HitePro status (command lock, %.1fs)", device["control_id"], time.time() - lock_time)
                 return
+
+            STATE[control_id] = payload
+            save_state(STATE)
+
+            open_val = STATE.get(device["open_id"], "0")
+            close_val = STATE.get(device["close_id"], "0")
+
+            o = str(open_val).strip()
+            c = str(close_val).strip()
+
             if o == "1" and c == "0":
                 if current_dir != "opening":
                     publish_cover_state(client, device["control_id"], "opening")
@@ -317,6 +319,7 @@ def on_message(client, userdata, msg):
         for suffix, val in actions:
             if device["type"] == "cover":
                 target = f"{prefix}/{suffix}/on"
+                STATE[suffix] = str(val)
             else:
                 target = f"{prefix}/{control_id}/on"
             client.publish(target, val)

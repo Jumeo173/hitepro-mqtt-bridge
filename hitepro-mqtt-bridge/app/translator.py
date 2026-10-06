@@ -46,19 +46,6 @@ def to_hitepro(device: dict, payload: str):
 
 
 def cover_state_from_parts(open_val: str, close_val: str) -> str:
-    """Определяет состояние cover по двум топикам."""
-    o = str(open_val).strip()
-    c = str(close_val).strip()
-    if o == "1" and c == "0":
-        return "open"
-    if o == "0" and c == "1":
-        return "closed"
-    if o == "0" and c == "0":
-        return "stopped"
-    return "unknown"
-
-
-def cover_state_from_parts(open_val: str, close_val: str) -> str:
     """Определяет состояние cover по двум топикам реле."""
     o = str(open_val).strip()
     c = str(close_val).strip()

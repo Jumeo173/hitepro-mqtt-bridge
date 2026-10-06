@@ -6,7 +6,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DEVICE_INFO = {
     "identifiers": ["hitepro_gateway"],
-    "name": "HitePro Gateway",
+    "name": "",
     "manufacturer": "HiTE-PRO",
     "model": "HitePro Gateway",
 }

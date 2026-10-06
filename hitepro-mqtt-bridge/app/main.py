@@ -71,6 +71,7 @@ def publish_cover_state(client, control_id, state):
 
 def start_cover_timer(client, control_id, direction):
     cancel_cover_timer(control_id)
+    COVER_DIRECTIONS[control_id] = direction
     final_state = "open" if direction == "opening" else "closed"
 
     def on_expire():
@@ -85,6 +86,23 @@ def start_cover_timer(client, control_id, direction):
     COVER_TIMERS[control_id] = timer
     _LOGGER.info("Cover %s: started %ds timer -> %s",
                  control_id, COVER_TRAVEL_TIME, final_state)
+
+
+def start_stop_timer(client, control_id):
+    """После STOP: briefly show 'stopped', then set 'open' (cover didn't fully close)."""
+    cancel_cover_timer(control_id)
+    publish_cover_state(client, control_id, "stopped")
+
+    def on_expire():
+        publish_cover_state(client, control_id, "open")
+        COVER_TIMERS.pop(control_id, None)
+        _LOGGER.info("Cover %s: stop timer expired -> open", control_id)
+
+    timer = threading.Timer(3, on_expire)
+    timer.daemon = True
+    timer.start()
+    COVER_TIMERS[control_id] = timer
+    _LOGGER.info("Cover %s: started 3s stop timer -> open", control_id)
 
 
 def cancel_cover_timer(control_id):
@@ -238,8 +256,7 @@ def on_message(client, userdata, msg):
                 publish_cover_state(client, device["control_id"], "closing")
                 start_cover_timer(client, device["control_id"], "closing")
             elif o == "0" and c == "0":
-                cancel_cover_timer(device["control_id"])
-                publish_cover_state(client, device["control_id"], "stopped")
+                start_stop_timer(client, device["control_id"])
             return
 
         ha_val = to_ha(device, payload)
@@ -269,8 +286,7 @@ def on_message(client, userdata, msg):
                 publish_cover_state(client, control_id, "closing")
                 start_cover_timer(client, control_id, "closing")
             elif cmd == "STOP":
-                cancel_cover_timer(control_id)
-                publish_cover_state(client, control_id, "stopped")
+                start_stop_timer(client, control_id)
 
         actions = to_hitepro(device, payload)
         for suffix, val in actions:

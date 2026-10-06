@@ -1,13 +1,33 @@
 name: HitePro MQTT Bridge
-version: 0.1.0
-description: Мост между HitePro и Home Assistant через MQTT
-url: https://github.com/Jumeo173/hitepro-mqtt-bridge
+version: "0.1.0"
+slug: hitepro_mqtt_bridge
+description: Bridge between HitePro and Home Assistant via MQTT
+arch:
+  - amd64
+  - aarch64
+  - armv7
+init: false
 ingress: true
 ingress_port: 8099
-
+services:
+  - mqtt
 options:
   hitepro_json_url: ""
   mqtt_host: "core-mosquitto"
   mqtt_port: 1883
-  mqtt_username: ""
+  mqtt_user: ""
   mqtt_password: ""
+  base_topic: "hitepro"
+  discovery_prefix: "homeassistant"
+  hitepro_device_prefix: "/devices/hite-pro/controls"
+  log_level: "info"
+schema:
+  hitepro_json_url: str
+  mqtt_host: str
+  mqtt_port: port
+  mqtt_user: str
+  mqtt_password: password
+  base_topic: str
+  discovery_prefix: str
+  hitepro_device_prefix: str
+  log_level: list(info|debug|warning|error)

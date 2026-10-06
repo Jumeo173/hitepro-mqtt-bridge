@@ -78,9 +78,7 @@ def start_cover_timer(client, control_id, direction):
     def on_expire():
         publish_cover_state(client, control_id, final_state)
         COVER_TIMERS.pop(control_id, None)
-        COVER_DIRECTIONS.pop(control_id, None)
-        _LOGGER.info("Cover %s: timer %ds expired -> %s",
-                     control_id, COVER_TRAVEL_TIME, final_state)
+        _LOGGER.info("Cover %s: timer %ds expired -> %s (direction kept: %s)", control_id, COVER_TRAVEL_TIME, final_state, direction)
 
     timer = threading.Timer(COVER_TRAVEL_TIME, on_expire)
     timer.daemon = True
@@ -99,8 +97,8 @@ def start_stop_timer(client, control_id):
     def on_expire():
         publish_cover_state(client, control_id, "open")
         COVER_TIMERS.pop(control_id, None)
-        COVER_DIRECTIONS.pop(control_id, None)
-        _LOGGER.info("Cover %s: stop timer expired -> open (direction cleared)", control_id)
+        COVER_DIRECTIONS[control_id] = "opening"
+        _LOGGER.info("Cover %s: stop timer expired -> open (direction set to opening)", control_id)
 
     timer = threading.Timer(3, on_expire)
     timer.daemon = True

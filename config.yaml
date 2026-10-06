@@ -1,0 +1,13 @@
+name: HitePro MQTT Bridge
+version: 0.1.0
+description: Мост между HitePro и Home Assistant через MQTT
+url: https://github.com/Jumeo173/hitepro-mqtt-bridge
+ingress: true
+ingress_port: 8099
+
+options:
+  hitepro_json_url: ""
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""

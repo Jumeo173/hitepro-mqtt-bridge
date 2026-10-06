@@ -284,7 +284,7 @@ def on_message(client, userdata, msg):
                     publish_cover_state(client, device["control_id"], "closing")
                     start_cover_timer(client, device["control_id"], "closing")
             elif o == "0" and c == "0":
-                if device["control_id"] in COVER_TIMERS or current_dir is not None:
+                if device["control_id"] in COVER_TIMERS:
                     start_stop_timer(client, device["control_id"])
             return
 

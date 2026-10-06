@@ -93,13 +93,14 @@ def start_cover_timer(client, control_id, direction):
 def start_stop_timer(client, control_id):
     """После STOP: briefly show 'stopped', then set 'open' (cover didn't fully close)."""
     cancel_cover_timer(control_id)
+    COVER_DIRECTIONS[control_id] = "stopped"
     publish_cover_state(client, control_id, "stopped")
 
     def on_expire():
         publish_cover_state(client, control_id, "open")
         COVER_TIMERS.pop(control_id, None)
         COVER_DIRECTIONS.pop(control_id, None)
-        _LOGGER.info("Cover %s: stop timer expired -> open", control_id)
+        _LOGGER.info("Cover %s: stop timer expired -> open (direction cleared)", control_id)
 
     timer = threading.Timer(3, on_expire)
     timer.daemon = True
@@ -254,6 +255,9 @@ def on_message(client, userdata, msg):
             c = str(close_val).strip()
 
             current_dir = COVER_DIRECTIONS.get(device["control_id"])
+            if current_dir == "stopped":
+                _LOGGER.info("Cover %s: ignoring HitePro status during stop", device["control_id"])
+                return
             if o == "1" and c == "0":
                 if current_dir != "opening":
                     publish_cover_state(client, device["control_id"], "opening")

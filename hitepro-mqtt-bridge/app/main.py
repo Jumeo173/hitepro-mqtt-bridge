@@ -266,11 +266,21 @@ def on_message(client, userdata, msg):
             c = str(close_val).strip()
 
             if o == "1" and c == "0":
-                if current_dir != "opening":
+                if current_dir == "closing":
+                    _LOGGER.info("Cover %s: ignoring stale OPEN echo (direction=%s)", device["control_id"], current_dir)
+                    STATE[device["open_id"]] = "0"
+                    STATE[device["close_id"]] = "1"
+                    save_state(STATE)
+                elif current_dir != "opening":
                     publish_cover_state(client, device["control_id"], "opening")
                     start_cover_timer(client, device["control_id"], "opening")
             elif o == "0" and c == "1":
-                if current_dir != "closing":
+                if current_dir == "opening":
+                    _LOGGER.info("Cover %s: ignoring stale CLOSE echo (direction=%s)", device["control_id"], current_dir)
+                    STATE[device["open_id"]] = "1"
+                    STATE[device["close_id"]] = "0"
+                    save_state(STATE)
+                elif current_dir != "closing":
                     publish_cover_state(client, device["control_id"], "closing")
                     start_cover_timer(client, device["control_id"], "closing")
             elif o == "0" and c == "0":

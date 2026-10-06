@@ -302,6 +302,7 @@ def on_message(client, userdata, msg):
                     start_stop_timer(client, control_id)
                 else:
                     _LOGGER.info("Cover %s: STOP ignored (not moving, state=%s)", control_id, cur_dir)
+                    return
 
         actions = to_hitepro(device, payload)
         for suffix, val in actions:

@@ -297,7 +297,11 @@ def on_message(client, userdata, msg):
                 publish_cover_state(client, control_id, "closing")
                 start_cover_timer(client, control_id, "closing")
             elif cmd == "STOP":
-                start_stop_timer(client, control_id)
+                cur_dir = COVER_DIRECTIONS.get(control_id, "stopped")
+                if cur_dir in ("opening", "closing"):
+                    start_stop_timer(client, control_id)
+                else:
+                    _LOGGER.info("Cover %s: STOP ignored (not moving, state=%s)", control_id, cur_dir)
 
         actions = to_hitepro(device, payload)
         for suffix, val in actions:
